@@ -1,0 +1,176 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@800&family=Inter:wght@400;600&display=swap');
+
+body { font-family: 'Inter', sans-serif; background: #f1f5f9; margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+header { background: white; padding: 12px 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; height: 60px; box-sizing: border-box; }
+header h1 { font-family: 'Montserrat', sans-serif; font-size: 1.4rem; color: #2563eb; margin: 0; letter-spacing: 2px; }
+
+.split-container { display: grid; grid-template-columns: 30% 40% 30%; flex-grow: 1; height: calc(100vh - 60px); overflow: hidden; }
+.section-one, .section-two, .section-three { display: flex; flex-direction: column; gap: 20px; padding: 20px; overflow-y: auto; height: 100%; box-sizing: border-box; }
+
+.section-one { border-right: 1px solid #e2e8f0; background: #f8fafc; }
+.section-two { border-right: 1px solid #e2e8f0; background: #ffffff; }
+
+/* Popups & Cards */
+.login-overlay { position: fixed; inset: 0; background: rgba(241, 245, 249, 0.95); display: flex; align-items: center; justify-content: center; z-index: 2000; }
+.login-card { background: white; padding: 40px; border-radius: 24px; width: 320px; text-align: center; box-shadow: 0 20px 50px rgba(37, 99, 235, 0.1); border: 1px solid #e2e8f0; }
+.login-card input { width: 100%; padding: 12px; margin-bottom: 12px; border-radius: 10px; border: 1px solid #e2e8f0; box-sizing: border-box; font-size: 0.9rem; }
+
+.card { background: white; padding: 18px; border-radius: 14px; border: 1px solid #e2e8f0; flex-shrink: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+h3 { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; border-bottom: 1px solid #f8fafc; padding-bottom: 10px; margin: 0 0 15px 0; letter-spacing: 1px; }
+
+/* Shift Roster */
+.shift-grid { display: flex; flex-direction: column; gap: 8px; }
+.shift-box { padding: 10px; border-radius: 10px; background: #f1f5f9; font-size: 0.7rem; border-left: 4px solid #cbd5e1; }
+.active-shift { background: #eff6ff; border-left-color: #2563eb; color: #1e40af; font-weight: 600; }
+
+/* Blinking Critical Banner */
+@keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+.critical-banner { 
+    background: #ef4444; color: white; padding: 12px; border-radius: 10px; font-weight: 800; 
+    text-align: center; position: sticky; top: 0; z-index: 10; margin-bottom: 15px;
+    animation: blink 1.5s infinite;
+}
+
+/* Task Cards */
+.task-card { display: flex; background: white; border: 1px solid #e2e8f0; margin-bottom: 12px; border-radius: 12px; overflow: hidden; }
+.task-main { flex-grow: 1; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+.task-desc { margin: 0; font-size: 0.85rem; font-weight: 600; color: #1e293b; }
+
+
+
+.task-actions-right { 
+    display: flex; 
+    flex-direction: column; 
+    justify-content: center; 
+    align-items: flex-end; /* Align text to the right for better visual flow */
+    padding: 10px; 
+    background: #f8fafc; 
+    border-left: 1px solid #e2e8f0; 
+    gap: 4px; 
+    min-width: 130px; /* Slightly increased width to accommodate the new label */
+}
+
+.done-time-right { 
+    color: #166534; 
+    font-weight: 800; 
+    font-size: 0.7rem; 
+    margin-top: auto; 
+    text-align: right;
+}
+
+
+.inline-assign { width: 100%; font-size: 0.65rem; padding: 4px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: 700; color: #2563eb; }
+
+/* Icon Styles */
+.icon-btn { width: 40px; height: 40px; border-radius: 10px; border: 1px solid #e2e8f0; background: white; cursor: pointer; color: #64748b; font-size: 1.1rem; }
+.upload-label { background: #eff6ff; color: #2563eb; width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1px solid #dbeafe; font-size: 1.1rem; }
+.process-btn { background: #2563eb; color: white; border: none; padding: 12px; border-radius: 10px; font-weight: 600; cursor: pointer; width: 100%; margin-top: 10px; }
+.check-btn { background: #dcfce7; color: #166534; width: 40px; height: 40px; border-radius: 10px; border: 1px solid #bbf7d0; cursor: pointer; }
+
+.prio-tag { font-size: 0.6rem; padding: 2px 6px; border-radius: 4px; font-weight: 900; }
+.prio-critical { background: #fee2e2; color: #b91c1c; }
+.prio-border-critical { border-left: 5px solid #ef4444 !important; }
+/* Important Task Styling (Yellow) */
+.prio-important { background: #fef9c3; color: #854d0e; }
+.prio-border-important { border-left: 5px solid #eab308 !important; }
+
+/* Routine Task Styling (Neutral/Grey) */
+.prio-routine { background: #f1f5f9; color: #475569; }
+.prio-border-routine { border-left: 5px solid #cbd5e1 !important; }
+
+
+.label { font-size: 0.6rem; padding: 2px 6px; border-radius: 4px; font-weight: 800; }
+.resident { background: #dcfce7; color: #166534; }
+.hidden-element { display: none; }
+
+/* Inventory: Now Purple */
+.inventory { 
+    background: #f5f3ff; 
+    color: #5b21b6; 
+    border: 1px solid #ddd6fe;
+}
+
+/* General: Now Teal */
+.general { 
+    background: #f0fdfa; 
+    color: #0f766e; 
+    border: 1px solid #ccfbf1;
+}
+
+
+/* Smooth Fade for Popups */
+.login-overlay {
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+/* Task Entry Animation */
+.task-card {
+    animation: slideIn 0.3s ease-out forwards;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.task-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateX(10px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+/* Status Indicator Pulse */
+.active-shift {
+    position: relative;
+    overflow: hidden;
+}
+
+.active-shift::after {
+    content: '';
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 8px;
+    height: 8px;
+    background: #2563eb;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(37, 99, 235, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+}
+
+/* Ensure the dashboard fills the space immediately upon display */
+#dashboardApp {
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Add a subtle entrance transition for the tasks */
+#myPendingBoard, #myCompletedBoard, #createdTasksBoard {
+    transition: opacity 0.3s ease-in-out;
+}
+
+.revert-btn {
+    background: #f1f5f9;
+    color: #64748b;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: all 0.2s;
+    margin-bottom: 5px;
+}
+
+.revert-btn:hover {
+    background: #e2e8f0;
+    color: #2563eb;
+}

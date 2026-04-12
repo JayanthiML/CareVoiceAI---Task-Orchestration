@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Care Voice AI</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+
+<audio id="soundSuccess" src="https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3" preload="auto"></audio>
+
+<audio id="soundComplete" src="https://assets.mixkit.co/active_storage/sfx/2569/2569-preview.mp3" preload="auto"></audio>
+
+<body>
+
+<div id="loginOverlay" class="login-overlay">
+    <div class="login-card">
+        <i class="fas fa-cloud-medical" style="font-size:3rem; color:#2563eb; margin-bottom:15px;"></i>
+        <h2>Carer Login</h2>
+        <select id="carerIdInput" style="width:100%; padding:12px; margin-bottom:12px; border-radius:10px; border:1px solid #e2e8f0;">
+            <option value="">Select Carer ID</option>
+        </select>
+        <input type="password" id="passwordInput" placeholder="Password">
+        <button onclick="attemptLogin()" class="process-btn">Login</button>
+    </div>
+</div>
+<div id="reminderOverlay" class="login-overlay" style="display:none; z-index:4000;">
+    <div class="login-card" style="border: 2px solid #ef4444;">
+        <i class="fas fa-exclamation-triangle" style="font-size:3rem; color:#ef4444; margin-bottom:15px;"></i>
+        <h2 style="color:#b91c1c;">Critical Task Reminder</h2>
+        <p id="reminderMessage" style="font-size:0.9rem; margin-bottom:20px;"></p>
+        <button onclick="acknowledgeReminder()" class="process-btn" style="background:#ef4444;">Acknowledge</button>
+    </div>
+</div>
+
+<div id="ackPopup" class="login-overlay" style="display:none; z-index:3000;">
+    <div class="login-card" style="width:400px;">
+        <i class="fas fa-clipboard-check" style="font-size:3rem; color:#16a34a; margin-bottom:15px;"></i>
+        <h2 style="margin-bottom:10px;">Shift Briefing</h2>
+        <p id="ackMessage" style="font-size:1rem; line-height:1.5; color:#475569; margin-bottom:20px;"></p>
+        <button onclick="closeAck()" class="process-btn" style="background:#16a34a;">Acknowledge & Start Shift</button>
+    </div>
+</div>
+
+<div id="dashboardApp" style="display:none;">
+    <header>
+        <h1>CAREVOICEAI</h1>
+        <div>
+            <span id="userBadge" style="font-weight:800; background:#f1f5f9; padding:6px 12px; border-radius:20px;"></span>
+            <button onclick="logout()" style="margin-left:10px; border:none; background:none; color:#ef4444; font-weight:700; cursor:pointer;">Logout</button>
+        </div>
+    </header>
+
+    <main class="split-container">
+        <div class="section-one">
+            <div class="card">
+                <h3>🎤 Scribe</h3>
+                <div style="display:flex; justify-content:center; gap:12px; padding:5px;">
+                    <button type="button" onclick="toggleRecording()" id="recBtn" class="icon-btn"><i class="fas fa-microphone"></i></button>
+                    <label for="audioFile" class="upload-label"><i class="fas fa-cloud-upload-alt"></i></label>
+                    <input type="file" id="audioFile" style="display:none;">
+                </div>
+                <button class="process-btn" onclick="upload()">Process Record</button>
+                <p id="status" style="text-align:center; font-size:0.7rem; margin-top:10px; color:#64748b;"></p>
+            </div>
+            <div class="card">
+                <h3>📅 Shift Roster</h3>
+                <div id="shiftDisplay" class="shift-grid"></div>
+            </div>
+            <div id="transcriptCard" class="card hidden-element">
+                <h3>📄 Transcript</h3>
+                <div id="transcript" style="font-size:0.8rem; white-space:pre-wrap;"></div>
+            </div>
+        </div>
+
+        <div class="section-two">
+            <div class="card">
+                <h3>📋 My Active Tasks</h3>
+                <div id="myPendingBoard"></div>
+            </div>
+            <div class="card">
+                <h3>✅ My Completed Tasks</h3>
+                <div id="myCompletedBoard"></div>
+            </div>
+        </div>
+
+        <div class="section-three">
+            <div id="criticalBanner" class="critical-banner" style="display:none;">CRITICAL TASKS PENDING</div>
+            <div class="card">
+                <h3>📤 Tasks Created By Me (Pending)</h3>
+                <div id="createdTasksBoard"></div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+const SHIFTS = [
+    { name: "Morning", ids: ["C-MOR-01", "C-MOR-02", "C-MOR-03"] },
+    { name: "Afternoon", ids: ["C-AFT-04", "C-AFT-05", "C-AFT-06"] },
+    { name: "Night", ids: ["C-NIG-07", "C-NIG-08", "C-NIG-09"] },
+    { name: "Manager", ids: ["C-MGR-01"] }
+];
+const MASTER_PASS = "Care@2026";
+
+function isManager(carerId) {
+    return carerId === "C-MGR-01";
+}
+
+function populateCarerDropdown() {
+    const dropdown = document.getElementById("carerIdInput");
+
+    dropdown.innerHTML = `<option value="">Select Carer ID</option>`;
+
+    SHIFTS.forEach(shift => {
+        const group = document.createElement("optgroup");
+        group.label = shift.name;
+
+        shift.ids.forEach(id => {
+            const option = document.createElement("option");
+            option.value = id;
+            option.textContent = id;
+            group.appendChild(option);
+        });
+
+        dropdown.appendChild(group);
+    });
+}
+
+async function attemptLogin() {
+    const id = document.getElementById("carerIdInput").value;
+    const pass = document.getElementById("passwordInput").value;
+    
+    if (SHIFTS.flatMap(s => s.ids).includes(id) && pass === MASTER_PASS) {
+        sessionStorage.setItem("active_carer", id);
+
+        // 🧑‍💼 MANAGER LOGIN → skip popup
+        if (id === "C-MGR-01") {
+            document.getElementById("loginOverlay").style.display = "none";
+
+            const dashboard = document.getElementById("dashboardApp");
+            dashboard.style.display = "block";
+
+            document.getElementById("userBadge").innerText = id;
+
+            // Show manager-only UI
+            showManagerDashboard();
+
+            setTimeout(() => {
+                refreshTasks();
+            }, 50);
+
+            return;
+        }
+
+        // 👩‍⚕️ NORMAL CARER FLOW (unchanged)
+        const res = await fetch("http://127.0.0.1:8000/tasks/pending");
+        const tasks = await res.json();
+
+        const myTasks = tasks.filter(t => t.carer_id === id);
+        const critCount = myTasks.filter(t => t.priority.toLowerCase() === 'critical').length;
+        const otherCount = myTasks.length - critCount;
+
+        document.getElementById("loginOverlay").style.display = "none";
+        document.getElementById("ackMessage").innerHTML = 
+            `Welcome back, <b>${id}</b>.<br><br>You currently have:<br>🔴 <b>${critCount} Critical</b> tasks<br>🔵 <b>${otherCount} Routine</b> tasks assigned.`;
+
+        document.getElementById("ackPopup").style.display = "flex";
+
+    } else {
+        alert("Invalid Credentials");
+    }
+}
+
+function closeAck() {
+    const sound = document.getElementById("soundSuccess");
+    sound.volume = 0.4;
+    sound.play();
+
+    document.getElementById("ackPopup").style.display = "none";
+
+    const dashboard = document.getElementById("dashboardApp");
+    dashboard.style.display = "block";
+
+    const carerId = sessionStorage.getItem("active_carer");
+    document.getElementById("userBadge").innerText = carerId;
+
+    // 🔥 Initialize shift tracking here
+    initializeShiftTracking();
+
+    setTimeout(() => {
+        renderShifts(); 
+        refreshTasks();
+    }, 50);
+
+    // Manager UI
+    if (carerId === "C-MGR-01") {
+        showManagerDashboard();
+    }
+
+    setTimeout(() => {
+        renderShifts(); 
+        refreshTasks();
+    }, 50);
+}
+
+let mediaRecorder;
+let audioChunks = [];
+let recordedBlob = null;
+let isRecording = false;
+
+async function toggleRecording() {
+    const status = document.getElementById("status");
+    const btn = document.getElementById("recBtn");
+
+    if (!isRecording) {
+        // START RECORDING
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+
+        mediaRecorder.ondataavailable = event => {
+            audioChunks.push(event.data);
+        };
+
+        mediaRecorder.onstop = () => {
+            recordedBlob = new Blob(audioChunks, { type: 'audio/wav' });
+            status.innerText = "Recording ready to process ✅";
+        };
+
+        mediaRecorder.start();
+        isRecording = true;
+
+        status.innerText = "Recording... 🎤";
+        btn.innerHTML = '<i class="fas fa-stop"></i>'; // change icon
+    } else {
+        // STOP RECORDING
+        mediaRecorder.stop();
+        isRecording = false;
+
+        btn.innerHTML = '<i class="fas fa-microphone"></i>'; // revert icon
+    }
+}
+
+
+
+
+
+function formatDateTime(dateStr) {
+    if (!dateStr) return "";
+
+    const date = new Date(dateStr);
+
+    return date.toLocaleString([], {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+// ================= SHIFT-BASED REMINDER SYSTEM =================
+
+// Store shift start when login is acknowledged
+function initializeShiftTracking() {
+    if (!localStorage.getItem("shift_start_time")) {
+        localStorage.setItem("shift_start_time", new Date().toISOString());
+        localStorage.setItem("reminder_1hr_done", "false");
+        localStorage.setItem("reminder_4hr_done", "false");
+        localStorage.setItem("escalation_done", "false");
+    }
+}
+
+function showReminderPopup(message) {
+    document.getElementById("reminderMessage").innerText = message;
+    document.getElementById("reminderOverlay").style.display = "flex";
+}
+
+function checkShiftBasedReminders() {
+    const shiftStart = localStorage.getItem("shift_start_time");
+    if (!shiftStart) return;
+
+    const startTime = new Date(shiftStart);
+    const now = new Date();
+    const diffMs = now - startTime;
+
+    const fourHours = 4 * 60 * 60 * 1000;
+
+    const fourHrDone = localStorage.getItem("reminder_4hr_done") === "true";
+
+    const carer = sessionStorage.getItem("active_carer");
+
+    fetch("http://127.0.0.1:8000/tasks/pending")
+        .then(r => r.json())
+        .then(tasks => {
+            const myCrit = tasks.filter(t => 
+                t.carer_id === carer && 
+                t.priority.toLowerCase() === 'critical'
+            );
+
+            if (myCrit.length === 0) return;
+
+            // 4 Hour Reminder
+            if (diffMs >= fourHours && !fourHrDone) {
+                showReminderPopup(`Critical tasks still pending! Immediate action required.`);
+                localStorage.setItem("reminder_4hr_done", "true");
+            }
+        });
+}
+
+function acknowledgeReminder() {
+    document.getElementById("reminderOverlay").style.display = "none";
+}
+
+function renderShifts() {
+    const container = document.getElementById("shiftDisplay");
+    const hr = new Date().getHours();
+    container.innerHTML = SHIFTS.map(s => {
+        let active = (s.name==="Morning" && hr>=10 && hr<18) || (s.name==="Afternoon" && (hr>=18 || hr<2)) || (s.name==="Night" && hr>=2 && hr<10);
+        return `<div class="shift-box ${active?'active-shift':''}"><strong>${s.name}</strong><br>${s.ids.join(", ")}</div>`;
+    }).join('');
+}
+
+async function refreshTasks() {
+    const carer = sessionStorage.getItem("active_carer");
+    if (!carer) return;
+
+    const resP = await fetch("http://127.0.0.1:8000/tasks/pending");
+    const pending = await resP.json();
+
+    // 🧑‍💼 MANAGER VIEW
+    if (carer === "C-MGR-01") {
+
+        const escalatedTasks = pending.filter(t => 
+            t.escalated_to === carer &&
+            t.priority.toLowerCase() === 'critical'
+        );
+
+        renderTasks(escalatedTasks, "managerBoard", false, "", true, false);
+        return;
+    }
+
+    // 👩‍⚕️ NORMAL CARER FLOW
+    const resC = await fetch("http://127.0.0.1:8000/tasks/completed");
+    const completed = await resC.json();
+
+    renderTasks(
+        pending.filter(t => t.carer_id === carer || t.escalated_to === carer),
+        "myPendingBoard", true, "REASSIGN TO", true, false
+    );
+
+    renderTasks(
+        completed.filter(t => t.completed_by_carer === carer),
+        "myCompletedBoard", false, "", false, true
+    );
+
+    renderTasks(
+        pending.filter(t => t.created_by === carer),
+        "createdTasksBoard", true, "ASSIGN TO", false, false
+    );
+
+    const hasCrit = pending.some(t => 
+        t.carer_id === carer && t.priority.toLowerCase() === 'critical'
+    );
+
+    document.getElementById("criticalBanner").style.display = hasCrit ? "block" : "none";
+}
+
+
+
+function renderTasks(tasks, elId, showAssign, labelTxt, showCheck, isCompleted) {
+    let html = "";
+
+    const allIds = SHIFTS.flatMap(s => s.ids);
+    const activeUser = sessionStorage.getItem("active_carer");
+    const isMgr = activeUser === "C-MGR-01";
+
+    tasks.forEach(t => {
+        const p = (t.priority || 'Routine').toLowerCase();
+
+        let actions = "";
+
+        // Only show actions for carers
+        if (!isMgr) {
+            actions = `<div class="task-actions-right">`;
+
+            if (showAssign) {
+                actions += `
+                    <span style="font-size:0.55rem; color:#94a3b8; font-weight:800;">
+                        ${labelTxt}
+                    </span>
+                    <select class="inline-assign" onchange="reassign(${t.id}, this.value)">
+                        ${allIds.map(id => `
+                            <option value="${id}" ${t.carer_id===id?'selected':''}>
+                                ${id}
+                            </option>
+                        `).join('')}
+                    </select>
+                `;
+            }
+
+            if (showCheck) {
+                actions += `
+                    <button class="check-btn" onclick="done(${t.id})">
+                        <i class="fas fa-check"></i>
+                    </button>
+                `;
+            }
+
+            if (isCompleted) {
+                actions += `
+                    <button class="revert-btn" onclick="revert(${t.id})">
+                        <i class="fas fa-undo"></i>
+                    </button>
+                    <div class="done-time-right">
+                        Completed at:<br>
+                        ${formatDateTime(t.completed_at)}
+                    </div>
+                `;
+            }
+
+            actions += `</div>`;
+        }
+        // 🔥 TASK CARD UI
+        html += `
+        <div class="task-card prio-border-${p}">
+            <div class="task-main">
+
+                <div style="display:flex; gap:5px; margin-bottom:5px;">
+                    <span class="label ${t.category.toLowerCase()}">${t.category}</span>
+                    <span class="prio-tag prio-${p}">${t.priority}</span>
+                </div>
+
+                <p class="task-desc">${t.description}</p>
+
+                <!-- 🔴 ESCALATION LABEL -->
+                ${t.escalated_to ? `
+                    <div style="font-size:0.6rem; color:#ef4444; font-weight:800;">
+                        ESCALATED TO ${t.escalated_to}
+                    </div>
+                ` : ""}
+
+                <!-- 🧑‍💼 MANAGER MODE LABEL -->
+                ${isMgr ? `
+                    <div style="font-size:0.6rem; color:#0f172a; font-weight:700;">
+                        
+                    </div>
+                ` : ""}
+
+                <!-- 📅 CREATED TIME -->
+                <div style="font-size:0.6rem; color:#94a3b8; margin-top:5px;">
+                    Creator: ${t.created_by} at ${formatDateTime(t.created_at)}
+                </div>
+
+            </div>
+
+            ${actions ? actions : ""}
+        </div>
+        `;
+    });
+
+    document.getElementById(elId).innerHTML =
+        html || "<p style='font-size:0.7rem; color:#cbd5e1; padding:10px;'>No tasks.</p>";
+}
+
+
+function showManagerDashboard() {
+
+    const app = document.getElementById("dashboardApp");
+
+    // 🔥 Replace entire layout with centered view
+    app.innerHTML = `
+        <div style="
+            display:flex;
+            justify-content:center;
+            align-items:center;
+            height:calc(100vh - 60px);
+            background:#f1f5f9;
+        ">
+            <div style="
+                width:600px;
+                max-height:80vh;
+                overflow-y:auto;
+            ">
+
+                <div class="card">
+                    <h3 style="text-align:center;">🚨 Escalated Critical Tasks</h3>
+                    <div id="managerBoard"></div>
+                </div>
+
+            </div>
+        </div>
+    `;
+}
+
+
+async function upload() {
+    const fileInput = document.getElementById("audioFile").files[0];
+    const status = document.getElementById("status");
+
+    let fileToUpload;
+
+    if (recordedBlob) {
+        fileToUpload = new File([recordedBlob], "recording.wav", { type: "audio/wav" });
+    } else if (fileInput) {
+        fileToUpload = fileInput;
+    } else {
+        return alert("Please record or upload audio.");
+    }
+
+    const fd = new FormData();
+    fd.append("file", fileToUpload);
+    fd.append("carer_id", sessionStorage.getItem("active_carer"));
+
+    status.innerText = "Processing...";
+
+    try {
+        const res = await fetch("http://127.0.0.1:8000/upload/", {
+            method: "POST",
+            body: fd
+        });
+
+        const data = await res.json();
+
+        document.getElementById("transcriptCard").classList.remove("hidden-element");
+        document.getElementById("transcript").innerText = data.transcript;
+
+        status.innerText = "Done ✅";
+        recordedBlob = null;
+
+        refreshTasks();
+    } catch (e) {
+        status.innerText = "Upload failed ❌";
+    }
+}
+
+async function reassign(tid, cid) { await fetch(`http://127.0.0.1:8000/tasks/${tid}/reassign/${cid}`, { method: "PUT" }); refreshTasks(); }
+
+async function done(tid) { 
+    const sound = document.getElementById("soundComplete");
+    sound.volume = 0.3; // Low volume for a subtle notification
+    sound.play();
+
+    const fd = new FormData(); 
+    fd.append("carer_id", sessionStorage.getItem("active_carer"));
+    
+    try {
+        await fetch(`http://127.0.0.1:8000/tasks/${tid}/complete`, { method: "PUT", body: fd }); 
+        refreshTasks(); 
+    } catch(e) {
+        console.error("Task completion failed", e);
+    }
+}
+
+async function revert(tid) {
+    if(confirm("Move this task back to Active?")) {
+        await fetch(`http://127.0.0.1:8000/tasks/${tid}/revert`, { method: "PUT" });
+        refreshTasks();
+    }
+}
+
+function logout() { sessionStorage.clear(); location.reload(); }
+
+function checkShiftEndEscalation() {
+    const shiftStart = localStorage.getItem("shift_start_time");
+    if (!shiftStart) return;
+
+    const startTime = new Date(shiftStart);
+    const now = new Date();
+
+    const diffMs = now - startTime;
+
+    const eightHours = 8 * 60 * 60 * 1000;
+
+    const escalationDone = localStorage.getItem("escalation_done") === "true";
+
+    if (diffMs < eightHours || escalationDone) return;
+
+    const carer = sessionStorage.getItem("active_carer");
+
+    fetch("http://127.0.0.1:8000/tasks/pending")
+        .then(r => r.json())
+        .then(tasks => {
+
+            const criticalTasks = tasks.filter(t => 
+                t.carer_id === carer &&
+                t.priority.toLowerCase() === 'critical'
+            );
+
+            if (criticalTasks.length === 0) return;
+
+            // 🔥 Escalate each task
+            criticalTasks.forEach(t => {
+                fetch(`http://127.0.0.1:8000/tasks/escalate/${t.id}`, {
+                    method: "PUT"
+                });
+            });
+
+            alert("🚨 Critical tasks escalated to Manager!");
+
+            localStorage.setItem("escalation_done", "true");
+
+            refreshTasks();
+        });
+}
+
+
+
+
+window.onload = () => {
+
+    populateCarerDropdown();
+
+    const savedCarer = sessionStorage.getItem("active_carer");
+
+    // 🔥 If already logged in → restore session
+    if (savedCarer) {
+
+        document.getElementById("loginOverlay").style.display = "none";
+        document.getElementById("dashboardApp").style.display = "block";
+        document.getElementById("userBadge").innerText = savedCarer;
+
+        // 🧑‍💼 MANAGER
+        if (savedCarer === "C-MGR-01") {
+            showManagerDashboard();
+        } 
+        // 👩‍⚕️ CARER
+        else {
+            renderShifts();
+        }
+
+        setTimeout(() => {
+            refreshTasks();
+        }, 50);
+
+    } else {
+        // Not logged in
+        document.getElementById("loginOverlay").style.display = "flex";
+        document.getElementById("dashboardApp").style.display = "none";
+    }
+
+    // ✅ Keep reminders running
+    setInterval(checkShiftBasedReminders, 60 * 1000);
+    setInterval(checkShiftEndEscalation, 60 * 1000);
+};
+
+
+</script>
+</body>
+</html>
